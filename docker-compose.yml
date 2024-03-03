@@ -37,7 +37,7 @@ services:
       - api01
       - api02
     ports:
-         Obrigatório expor/usar a porta 9999 no load balancer!
+         #Obrigatório expor/usar a porta 9999 no load balancer!
       - "9999:9999" 
     deploy:
       resources:
