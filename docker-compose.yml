@@ -54,7 +54,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=rinha
     ports:
-      - "5433:5433"
+      - "5432:5432"
     volumes:
       - ./script.sql:/docker-entrypoint-initdb.d/script.sql
     deploy:
