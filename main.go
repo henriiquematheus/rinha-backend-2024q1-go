@@ -10,7 +10,7 @@ import (
 
 func main() {
 	// Substitua a string de conexão conforme necessário
-	connectionString := "postgres://rinha:123@db:5432/rinha"
+	connectionString := "postgres://postgres:postgres@db:5432/rinha"
 
 	err := connection.Init(connectionString)
 	if err != nil {
