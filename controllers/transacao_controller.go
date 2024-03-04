@@ -3,12 +3,9 @@ package controllers
 
 import (
 	"fmt"
-	"time"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/henriiquematheus/rinha-backend-2024q1-go/db"
-	"github.com/henriiquematheus/rinha-backend-2024q1-go/models"
+	"rinha-backend-2024q1-go/models"
 )
 
 // ProcessarTransacao processa uma transação

@@ -4,9 +4,9 @@ package main
 import (
 	"log"
 
-	connection "rinha-backend-2024q1-go/db"
+	"rinha-backend-2024q1-go/db"
 	"github.com/gofiber/fiber/v2"
-	"github.com/henriiquematheus/rinha-backend-2024q1-go/routes"
+	"rinha-backend-2024q1-go/routes"
 )
 
 func main() {

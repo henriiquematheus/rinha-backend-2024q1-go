@@ -2,12 +2,12 @@
 package controllers
 
 import (
-	"time"
-
+	"strconv"
+	"context"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/henriiquematheus/rinha-backend-2024q1-go/db"
-	"github.com/henriiquematheus/rinha-backend-2024q1-go/models"
+	db "rinha-backend-2024q1-go/db"
+	"rinha-backend-2024q1-go/models"
 )
 
 // ObterExtrato obtém o extrato do cliente
@@ -24,13 +24,20 @@ func ObterExtrato(c *fiber.Ctx) error {
 	}
 	defer conn.Release()
 
+	// Iniciar uma transação no banco de dados
+	tx, err := conn.Begin(c.Context())
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Erro ao iniciar uma transação no banco de dados"})
+	}
+	defer tx.Rollback(c.Context())
+
 	// Obter informações do cliente e transações
-	cliente, err := ObterClientePorID(conn, clienteID)
+	cliente, err := ObterClientePorID(tx, clienteID)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "Cliente não encontrado"})
 	}
 
-	transacoes, err := ObterUltimasTransacoes(conn, clienteID)
+	transacoes, err := ObterUltimasTransacoes(tx, clienteID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Erro ao obter as transações do cliente"})
 	}
@@ -39,7 +46,7 @@ func ObterExtrato(c *fiber.Ctx) error {
 	response := fiber.Map{
 		"saldo": fiber.Map{
 			"total":       cliente.Saldo,
-			"data_extrato": time.Now().UTC(),
+			"data_extrato": cliente.Saldo.DataExtrato,
 			"limite":      cliente.Limite,
 		},
 		"ultimas_transacoes": transacoes,
@@ -50,7 +57,7 @@ func ObterExtrato(c *fiber.Ctx) error {
 
 // ObterUltimasTransacoes obtém as últimas transações do cliente
 func ObterUltimasTransacoes(tx pgx.Tx, clienteID int) ([]models.Transacao, error) {
-	rows, err := tx.Query(tx.Context(), `
+	rows, err := tx.Query(context.Background(), `
 		SELECT valor, tipo, descricao, realizada_em
 		FROM transacoes
 		WHERE client_id = $1
@@ -74,4 +81,30 @@ func ObterUltimasTransacoes(tx pgx.Tx, clienteID int) ([]models.Transacao, error
 	}
 
 	return transacoes, nil
+}
+
+// ObterClientePorID obtém as informações do cliente do banco de dados
+func ObterClientePorID(tx pgx.Tx, clienteID int) (*models.Cliente, error) {
+	cliente := &models.Cliente{}
+	err := tx.QueryRow(context.Background(), `
+    SELECT id, nome, limite, saldo, data_extrato
+    FROM clientes
+    WHERE id = $1
+`, clienteID).Scan(&cliente.ID, &cliente.Nome, &cliente.Saldo.Total, &cliente.Saldo.Limite, &cliente.Saldo.DataExtrato)
+	if err != nil {
+		return nil, err
+	}
+
+	return cliente, nil
+}
+
+func extrairClienteID(c *fiber.Ctx) (int, error) {
+	// Lógica para extrair o ID do cliente do contexto, por exemplo, dos parâmetros da rota
+	// Aqui, estou assumindo que o ID do cliente está nos parâmetros da rota com a chave "id"
+	id := c.Params("id")
+	clienteID, err := strconv.Atoi(id)
+	if err != nil {
+		return 0, err
+	}
+	return clienteID, nil
 }

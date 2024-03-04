@@ -14,4 +14,8 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/server .
 
-CMD ["./server"]
+# Garante que o binário seja executável
+RUN chmod +x /app/server
+
+# O comando `CMD` define o comando padrão a ser executado quando o contêiner é iniciado
+CMD ["/app/server"]

@@ -2,7 +2,7 @@ package routes
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/henriiquematheus/rinha-backend-2024q1-go/controllers"
+	"rinha-backend-2024q1-go/controllers"
 )
 
 func SetupRoutes(app *fiber.App) {
