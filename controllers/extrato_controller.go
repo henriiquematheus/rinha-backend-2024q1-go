@@ -2,15 +2,15 @@
 package controllers
 
 import (
-	"strconv"
 	"context"
-	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5"
 	db "rinha-backend-2024q1-go/db"
 	"rinha-backend-2024q1-go/models"
+	"strconv"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 )
 
-// ObterExtrato obtém o extrato do cliente
 func ObterExtrato(c *fiber.Ctx) error {
 	clienteID, err := extrairClienteID(c)
 	if err != nil {
@@ -45,9 +45,9 @@ func ObterExtrato(c *fiber.Ctx) error {
 	// Criar resposta do extrato
 	response := fiber.Map{
 		"saldo": fiber.Map{
-			"total":       cliente.Saldo,
+			"total":        cliente.Saldo,
 			"data_extrato": cliente.Saldo.DataExtrato,
-			"limite":      cliente.Limite,
+			"limite":       cliente.Limite,
 		},
 		"ultimas_transacoes": transacoes,
 	}
@@ -55,7 +55,6 @@ func ObterExtrato(c *fiber.Ctx) error {
 	return c.Status(200).JSON(response)
 }
 
-// ObterUltimasTransacoes obtém as últimas transações do cliente
 func ObterUltimasTransacoes(tx pgx.Tx, clienteID int) ([]models.Transacao, error) {
 	rows, err := tx.Query(context.Background(), `
 		SELECT valor, tipo, descricao, realizada_em
@@ -83,8 +82,7 @@ func ObterUltimasTransacoes(tx pgx.Tx, clienteID int) ([]models.Transacao, error
 	return transacoes, nil
 }
 
-// ObterClientePorID obtém as informações do cliente do banco de dados
-func ObterClientePorID(tx pgx.Tx, clienteID int) (*models.Cliente, error) {
+func ObterClientePorIDExtrato(tx pgx.Tx, clienteID int) (*models.Cliente, error) {
 	cliente := &models.Cliente{}
 	err := tx.QueryRow(context.Background(), `
     SELECT id, nome, limite, saldo, data_extrato
@@ -99,8 +97,6 @@ func ObterClientePorID(tx pgx.Tx, clienteID int) (*models.Cliente, error) {
 }
 
 func extrairClienteID(c *fiber.Ctx) (int, error) {
-	// Lógica para extrair o ID do cliente do contexto, por exemplo, dos parâmetros da rota
-	// Aqui, estou assumindo que o ID do cliente está nos parâmetros da rota com a chave "id"
 	id := c.Params("id")
 	clienteID, err := strconv.Atoi(id)
 	if err != nil {

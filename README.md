@@ -12,6 +12,6 @@ Com muitas lagrimas e sofrimento, tá ai minha versão. Primeira vez usando go e
 [repository](https://github.com/henriiquematheus/rinha-backend-2024q1-go) - [rinha info](https://github.com/zanfranceschi/rinha-de-backend-2024-q1)
 
 
-[@linkedin]()
+[@linkedin](https://www.linkedin.com/in/matheushenrique-dev/)
 
 

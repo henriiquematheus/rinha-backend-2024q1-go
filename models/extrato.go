@@ -3,7 +3,7 @@ package models
 import "time"
 
 type Extrato struct {
-	Saldo            Saldo       `json:"saldo"`
+	Saldo             Saldo       `json:"saldo"`
 	UltimasTransacoes []Transacao `json:"ultimas_transacoes"`
 }
 

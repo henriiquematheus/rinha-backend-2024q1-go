@@ -3,14 +3,13 @@ package main
 
 import (
 	"log"
-
-	"rinha-backend-2024q1-go/db"
-	"github.com/gofiber/fiber/v2"
+	connection "rinha-backend-2024q1-go/db"
 	"rinha-backend-2024q1-go/routes"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 func main() {
-	// Substitua a string de conexão conforme necessário
 	connectionString := "postgres://postgres:postgres@db:5432/rinha"
 
 	err := connection.Init(connectionString)
@@ -23,7 +22,6 @@ func main() {
 	app := fiber.New()
 	routes.SetupRoutes(app)
 
-	// Adicionando mensagem de log
 	log.Println("Servidor iniciado na porta 8080")
 
 	err = app.Listen(":8080")
