@@ -78,8 +78,6 @@ func CriarTransacao(c *fiber.Ctx) error {
 }
 
 func validarCamposTransacao(transacao models.Transacao) string {
-	// Validar campos conforme as regras fornecidas na checklist
-	// Retornar string de mensagem de erro em caso de campos inválidos
 	var errMsg string
 
 	// 1. Verificar se o campo valor é um número inteiro positivo.
@@ -102,7 +100,7 @@ func validarCamposTransacao(transacao models.Transacao) string {
 }
 
 func calcularNovoSaldo(saldoAtual int, transacao models.Transacao) int {
-	// Calcular o novo saldo com base na transação (crédito ou débito)
+
 	if transacao.Tipo == "c" {
 		return saldoAtual + transacao.Valor
 	} else {
@@ -111,7 +109,7 @@ func calcularNovoSaldo(saldoAtual int, transacao models.Transacao) int {
 }
 
 func AtualizarSaldoCliente(tx pgx.Tx, clienteID int, novoSaldo int) error {
-	// Atualizar o saldo do cliente no banco de dados
+
 	_, err := tx.Exec(context.Background(), `
 		UPDATE clientes
 		SET saldo = $1
@@ -122,7 +120,6 @@ func AtualizarSaldoCliente(tx pgx.Tx, clienteID int, novoSaldo int) error {
 }
 
 func RegistrarTransacao(tx pgx.Tx, clienteID int, transacao models.Transacao) error {
-	// Registrar a transação no banco de dados
 	_, err := tx.Exec(context.Background(), `
 		INSERT INTO transacoes (client_id, valor, tipo, descricao, realizada_em)
 		VALUES ($1, $2, $3, $4, $5)
