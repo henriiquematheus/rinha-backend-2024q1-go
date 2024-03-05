@@ -1,4 +1,5 @@
-# rinha-backend-2024q1-go
+# Rinha em go por aspirante a estagiario.
+
 <img src="assets/rinha.jpg" alt="meme rinha" width="400" height="533">
 
 Com muitas lagrimas e sofrimento, tá ai minha versão. Primeira vez usando go em um projeto 🤗

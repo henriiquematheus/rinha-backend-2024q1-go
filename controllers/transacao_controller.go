@@ -2,124 +2,131 @@
 package controllers
 
 import (
-	"fmt"
+	"context"
+	db "rinha-backend-2024q1-go/db"
+	"rinha-backend-2024q1-go/models"
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
-	"rinha-backend-2024q1-go/models"
 )
 
-// ProcessarTransacao processa uma transação
-func ProcessarTransacao(c *fiber.Ctx) error {
-	var transacao models.Transacao
-
-	// Parse do corpo da requisição para a estrutura de dados Transacao
-	if err := c.BodyParser(&transacao); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"error": "Erro ao analisar o corpo da requisição",
-		})
+func CriarTransacao(c *fiber.Ctx) error {
+	// 1. Parse da Requisição
+	clienteID, err := extrairClienteID(c)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "ID do cliente inválido"})
 	}
 
-	// Obter uma conexão do pool do banco de dados
+	var transacao models.Transacao
+	if err := c.BodyParser(&transacao); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Erro ao parsear o corpo da requisição"})
+	}
+
+	// 2. Validações de Campos
+	errMsg := validarCamposTransacao(transacao)
+	if errMsg != "" {
+		return c.Status(422).JSON(fiber.Map{"error": errMsg})
+	}
+
+	// 3. Verificação de Cliente
 	conn, err := db.GetPool().Acquire(c.Context())
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error": "Erro ao obter uma conexão do pool do banco de dados",
-		})
+		return c.Status(500).JSON(fiber.Map{"error": "Erro ao obter uma conexão do pool do banco de dados"})
 	}
 	defer conn.Release()
 
-	// Iniciar uma transação no banco de dados
 	tx, err := conn.Begin(c.Context())
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error": "Erro ao iniciar uma transação no banco de dados",
-		})
+		return c.Status(500).JSON(fiber.Map{"error": "Erro ao iniciar uma transação no banco de dados"})
 	}
 	defer tx.Rollback(c.Context())
 
-	// Executar a lógica de transação
-	cliente, err := AtualizarSaldo(tx, transacao.ClienteID, transacao.Valor, transacao.Tipo)
+	cliente, err := ObterClientePorIDExtrato(tx, clienteID)
 	if err != nil {
-		// Tratar erros específicos aqui, se necessário
-		switch err {
-		case ErrClienteNaoEncontrado:
+		if err == pgx.ErrNoRows {
 			return c.Status(404).JSON(fiber.Map{"error": "Cliente não encontrado"})
-		case ErrLimiteExcedido:
-			return c.Status(422).JSON(fiber.Map{"error": "Transação de débito excede o limite do cliente"})
-		default:
-			return c.Status(500).JSON(fiber.Map{"error": "Erro ao processar a transação"})
 		}
+		return c.Status(500).JSON(fiber.Map{"error": "Erro ao obter informações do cliente"})
 	}
 
-	// Commit da transação
-	if err := tx.Commit(c.Context()); err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error": "Erro ao fazer commit da transação no banco de dados",
-		})
+	// 4. Realização da Transação
+	novoSaldo := calcularNovoSaldo(cliente.Saldo.Total, transacao)
+	if novoSaldo < -cliente.Saldo.Limite {
+		return c.Status(422).JSON(fiber.Map{"error": "Transação resulta em saldo inconsistente"})
 	}
 
-	// Retorne a resposta com os dados atualizados
-	return c.Status(200).JSON(fiber.Map{
-		"limite": cliente.Limite,
-		"saldo":  cliente.Saldo,
-	})
+	// Atualizar saldo do cliente no banco de dados
+	if err := AtualizarSaldoCliente(tx, clienteID, novoSaldo); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Erro ao atualizar saldo do cliente"})
+	}
+
+	// Registrar a transação no banco de dados
+	if err := RegistrarTransacao(tx, clienteID, transacao); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Erro ao registrar a transação"})
+	}
+
+	tx.Commit(c.Context())
+
+	// 5. Resposta
+	response := fiber.Map{
+		"limite": cliente.Saldo.Limite,
+		"saldo":  novoSaldo,
+	}
+
+	return c.Status(200).JSON(response)
 }
 
-var (
-	// ErrClienteNaoEncontrado é um erro indicando que o cliente não foi encontrado.
-	ErrClienteNaoEncontrado = fmt.Errorf("Cliente não encontrado")
-	
-	// ErrLimiteExcedido é um erro indicando que o limite do cliente foi excedido durante uma transação de débito.
-	ErrLimiteExcedido = fmt.Errorf("Transação de débito excede o limite do cliente")
-)
+func validarCamposTransacao(transacao models.Transacao) string {
+	// Validar campos conforme as regras fornecidas na checklist
+	// Retornar string de mensagem de erro em caso de campos inválidos
+	var errMsg string
 
-// AtualizarSaldo atualiza o saldo e o limite do cliente no banco de dados
-func AtualizarSaldo(tx pgx.Tx, clienteID int, valor int, tipo string) (*models.Cliente, error) {
-	// Obter informações atuais do cliente
-	cliente, err := ObterClientePorID(tx, clienteID)
-	if err != nil {
-		return nil, ErrClienteNaoEncontrado
+	// 1. Verificar se o campo valor é um número inteiro positivo.
+	if transacao.Valor <= 0 {
+		errMsg = "O valor deve ser um número inteiro positivo"
 	}
 
-	// Validar a transação com base no tipo (crédito ou débito)
-	if tipo == "d" && cliente.Saldo-valor < -cliente.Limite {
-		return nil, ErrLimiteExcedido
+	// 2. Validar se o campo tipo contém apenas "c" ou "d".
+	if transacao.Tipo != "c" && transacao.Tipo != "d" {
+		errMsg = "O tipo deve ser 'c' para crédito ou 'd' para débito"
 	}
 
-	// Atualizar o saldo e limite com base no tipo de transação
-	if tipo == "c" {
-		cliente.Saldo += valor
-	} else if tipo == "d" {
-		cliente.Saldo -= valor
-		cliente.Limite -= valor
+	// 3. Validar se o campo descricao tem entre 1 e 10 caracteres.
+	descricaoLen := len(transacao.Descricao)
+	if descricaoLen < 1 || descricaoLen > 10 {
+		errMsg = "A descrição deve ter entre 1 e 10 caracteres"
 	}
 
-	// Atualizar o cliente no banco de dados
-	_, err = tx.Exec(tx.Context(), `
+	return errMsg
+}
+
+func calcularNovoSaldo(saldoAtual int, transacao models.Transacao) int {
+	// Calcular o novo saldo com base na transação (crédito ou débito)
+	if transacao.Tipo == "c" {
+		return saldoAtual + transacao.Valor
+	} else {
+		return saldoAtual - transacao.Valor
+	}
+}
+
+func AtualizarSaldoCliente(tx pgx.Tx, clienteID int, novoSaldo int) error {
+	// Atualizar o saldo do cliente no banco de dados
+	_, err := tx.Exec(context.Background(), `
 		UPDATE clientes
-		SET saldo = $1, limite = $2
-		WHERE id = $3
-	`, cliente.Saldo, cliente.Limite, clienteID)
+		SET saldo = $1
+		WHERE id = $2
+	`, novoSaldo, clienteID)
 
-	if err != nil {
-		return nil, err
-	}
-
-	return cliente, nil
+	return err
 }
 
-// ObterClientePorID obtém as informações do cliente do banco de dados
-func ObterClientePorID(tx pgx.Tx, clienteID int) (*models.Cliente, error) {
-	cliente := &models.Cliente{}
-	err := tx.QueryRow(tx.Context(), `
-		SELECT id, nome, limite, saldo
-		FROM clientes
-		WHERE id = $1
-	`, clienteID).Scan(&cliente.ID, &cliente.Nome, &cliente.Limite, &cliente.Saldo)
+func RegistrarTransacao(tx pgx.Tx, clienteID int, transacao models.Transacao) error {
+	// Registrar a transação no banco de dados
+	_, err := tx.Exec(context.Background(), `
+		INSERT INTO transacoes (client_id, valor, tipo, descricao, realizada_em)
+		VALUES ($1, $2, $3, $4, $5)
+	`, clienteID, transacao.Valor, transacao.Tipo, transacao.Descricao, time.Now())
 
-	if err != nil {
-		return nil, err
-	}
-
-	return cliente, nil
+	return err
 }

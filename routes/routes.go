@@ -7,7 +7,7 @@ import (
 )
 
 func SetupRoutes(app *fiber.App) {
-	app.Post("/clientes/:id/transacoes", controllers.ProcessarTransacao)
+	app.Post("/clientes/:id/transacoes", controllers.CriarTransacao)
 
 	extrato := app.Group("/clientes/:id/extrato")
 	extrato.Get("/", controllers.ObterExtrato)
