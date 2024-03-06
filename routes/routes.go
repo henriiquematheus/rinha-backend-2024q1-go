@@ -7,6 +7,10 @@ import (
 )
 
 func SetupRoutes(app *fiber.App) {
+
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.SendString("alguem me da um emprego, é serio, EU PRECISO, aceito 600 reais")
+	})
 	app.Post("/clientes/:id/transacoes", controllers.CriarTransacao)
 
 	extrato := app.Group("/clientes/:id/extrato")

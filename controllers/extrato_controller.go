@@ -4,6 +4,7 @@ package controllers
 import (
 	"context"
 	"errors"
+	"log"
 	connection "rinha-backend-2024q1-go/db"
 	"rinha-backend-2024q1-go/models"
 	"strconv"
@@ -34,7 +35,7 @@ func ObterUltimasTransacoes(tx pgx.Tx, clienteID int) ([]models.Transacao, error
         FROM transacoes
         WHERE client_id = $1
         ORDER BY realizada_em DESC
-        LIMIT 5  -- Ajuste o limite conforme necessário
+        LIMIT 10
     `, clienteID)
 	if err != nil {
 		return nil, err
@@ -81,6 +82,7 @@ func ObterExtrato(c *fiber.Ctx) error {
 	// Obter uma conexão do pool do banco de dados
 	conn, err := connection.GetPool().Acquire(c.Context())
 	if err != nil {
+		log.Printf("Erro ao obter uma conexão do pool do banco de dados: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Erro ao obter uma conexão do pool do banco de dados"})
 	}
 	defer conn.Release()
@@ -88,6 +90,7 @@ func ObterExtrato(c *fiber.Ctx) error {
 	// Iniciar uma transação no banco de dados
 	tx, err := conn.Begin(c.Context())
 	if err != nil {
+		log.Printf("Erro ao iniciar uma transação no banco de dados: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Erro ao iniciar uma transação no banco de dados"})
 	}
 	defer tx.Rollback(c.Context())
@@ -96,16 +99,21 @@ func ObterExtrato(c *fiber.Ctx) error {
 	cliente, err := ObterClientePorIDExtrato(tx, clienteID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			log.Println("Cliente não encontrado.")
 			return c.Status(404).JSON(fiber.Map{"error": "Cliente não encontrado"})
 		}
+		log.Printf("Erro ao obter informações do cliente: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Erro ao obter informações do cliente"})
 	}
 
+	// Obter as últimas transações
 	transacoes, err := ObterUltimasTransacoes(tx, clienteID)
 	if err != nil {
+		log.Printf("Erro ao obter as transações do cliente: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Erro ao obter as transações do cliente"})
 	}
 
+	// Calcular saldo total
 	saldoTotal := calcularSaldoTotal(cliente.Saldo.Total, transacoes)
 
 	// Criar resposta do extrato
@@ -122,7 +130,6 @@ func ObterExtrato(c *fiber.Ctx) error {
 }
 
 func calcularSaldoTotal(saldoAtual int, transacoes []models.Transacao) int {
-
 	for _, transacao := range transacoes {
 		if transacao.Tipo == "c" {
 			saldoAtual += transacao.Valor
